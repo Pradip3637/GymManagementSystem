@@ -4,9 +4,9 @@ using GymManagementSystem.API.Models;
 
 namespace GymManagementSystem.Business.Interfaces
 {
-    public interface IMemberRepository
+    public interface IMember_Tableervice
     {
-        Task<IEnumerable<Member>> GetAllMembersAsync();
+        Task<IEnumerable<Member>> GetAllMember_TableAsync();
         Task<Member> GetMemberByIdAsync(int id);
         Task<Member> AddMemberAsync(Member member);
         Task<Member> UpdateMemberAsync(Member member);

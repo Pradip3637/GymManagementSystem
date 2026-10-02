@@ -1,12 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using GymManagementSystem.API.Models;
+﻿using GymManagementSystem.API.Models;
 
-namespace GymManagementSystem.Business.Interfaces
+namespace GymManagement.DataAcces.Repositories
 {
-    public interface IMemberService
+    public interface IMemberRepository
     {
-        Task<IEnumerable<Member>> GetAllMembersAsync();
+        Task<IEnumerable<Member>> GetAllMember_TableAsync();
         Task<Member> GetMemberByIdAsync(int id);
         Task<Member> AddMemberAsync(Member member);
         Task<Member> UpdateMemberAsync(Member member);

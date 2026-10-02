@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GymManagement.DataAcces\GymManagement.DataAcces.csproj" />
-    <ProjectReference Include="..\GymManagement.Domain\GymManagement.Domain.csproj" />
   </ItemGroup>
 
 </Project>
