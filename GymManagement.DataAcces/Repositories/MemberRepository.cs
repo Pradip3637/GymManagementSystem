@@ -1,6 +1,6 @@
 ﻿using GymManagement.DataAcces.Data;
 using GymManagementSystem.API.Models;
-using GymManagementSystem.Business.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace GymManagement.DataAcces.Repositories
 {
@@ -12,16 +12,16 @@ namespace GymManagement.DataAcces.Repositories
         {
             _dbContext = dbContext;
         }
-        public async Task<IEnumerable<Member>> GetAllMembersAsync()
+        public async Task<IEnumerable<Member>> GetAllMember_TableAsync()
         {
-            var list = _dbContext.Members.ToList();
+            var list = await _dbContext.Member_Table.ToListAsync();
             return list;
         }
 
         public async Task<Member> GetMemberByIdAsync(int id)
         {
-            return  _dbContext.Members.Find(id);
-            //return _dbContext.Members.Where(x => x.Id == id).FirstOrDefault();
+            return  _dbContext.Member_Table.Find(id);
+            //return _dbContext.Member_Table.Where(x => x.Id == id).FirstOrDefault();
         }
 
         public async Task<Member> AddMemberAsync(Member? member)
@@ -32,17 +32,17 @@ namespace GymManagement.DataAcces.Repositories
         }
         public async Task<Member> UpdateMemberAsync(Member member)
         {
-            _dbContext.Members.Update(member);
+            _dbContext.Member_Table.Update(member);
             _dbContext.SaveChanges();
             return member;
         }
 
         public async Task<bool> DeleteMemberAsync(int id)
         {
-            var member = _dbContext.Members.Find(id);
+            var member = _dbContext.Member_Table.Find(id);
             if (member == null) return false;
 
-            _dbContext.Members.Remove(member);
+            _dbContext.Member_Table.Remove(member);
             _dbContext.SaveChanges();
             return true;
         }

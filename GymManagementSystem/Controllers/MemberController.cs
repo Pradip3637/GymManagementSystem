@@ -5,27 +5,27 @@ using Microsoft.AspNetCore.Mvc;
 namespace GymManagementSystem.API.Controllers
 {
     [ApiController]
-    [Route("api/Members")]
+    [Route("api/Member_Table")]
     public class MemberController : ControllerBase
     {
-        private readonly IMemberService _memberService;
+        private readonly IMember_Tableervice _Member_Tableervice;
 
-        public MemberController(IMemberService memberService)
+        public MemberController(IMember_Tableervice Member_Tableervice)
         {
-            _memberService = memberService;
+            _Member_Tableervice = Member_Tableervice;
         }
 
         [HttpGet]
         public async Task<IActionResult> Index()
         {
-            var members = await _memberService.GetAllMembersAsync();
-            return Ok(members);
+            var Member_Table = await _Member_Tableervice.GetAllMember_TableAsync();
+            return Ok(Member_Table);
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var member = await _memberService.GetMemberByIdAsync(id);
+            var member = await _Member_Tableervice.GetMemberByIdAsync(id);
             if (member == null) return NotFound();
             return Ok(member);
         }
@@ -33,7 +33,7 @@ namespace GymManagementSystem.API.Controllers
         [HttpPost]
         public async Task<IActionResult> AddMemberAsync([FromBody] Member member)
         {
-            var created = await _memberService.AddMemberAsync(member);
+            var created = await _Member_Tableervice.AddMemberAsync(member);
             return CreatedAtAction(nameof(Index), new { id = created.Id }, created);
         }
 
@@ -42,17 +42,17 @@ namespace GymManagementSystem.API.Controllers
         {
             if (id != member.Id) return BadRequest("ID mismatch");
 
-            var existing = await _memberService.GetMemberByIdAsync(id);
+            var existing = await _Member_Tableervice.GetMemberByIdAsync(id);
             if (existing == null) return NotFound();
 
-            var updated = await _memberService.UpdateMemberAsync(member);
+            var updated = await _Member_Tableervice.UpdateMemberAsync(member);
             return Ok(updated);
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteMemberAsync(int id)
         {
-            var deleted = await _memberService.DeleteMemberAsync(id);
+            var deleted = await _Member_Tableervice.DeleteMemberAsync(id);
             if (!deleted) return NotFound();
             return NoContent();
         }

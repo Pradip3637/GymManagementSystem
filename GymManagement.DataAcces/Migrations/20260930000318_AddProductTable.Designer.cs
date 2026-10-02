@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GymManagement.DataAcces.Migrations
 {
     [DbContext(typeof(GymDbContext))]
-    [Migration("20260830092506_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260930000318_AddProductTable")]
+    partial class AddProductTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,40 @@ namespace GymManagement.DataAcces.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("GymManagement.Domain.Models.Product", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Image")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<double>("Rating")
+                        .HasColumnType("float");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Products");
+                });
 
             modelBuilder.Entity("GymManagementSystem.API.Models.Member", b =>
                 {
@@ -42,7 +76,7 @@ namespace GymManagement.DataAcces.Migrations
                     b.Property<DateTime>("JoinDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("MembershipPlan")
+                    b.Property<string>("Member_TablehipPlan")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Phone")
@@ -50,7 +84,7 @@ namespace GymManagement.DataAcces.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Members");
+                    b.ToTable("Member_Table");
                 });
 #pragma warning restore 612, 618
         }

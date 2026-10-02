@@ -1,4 +1,5 @@
-﻿using GymManagementSystem.API.Models;
+﻿using GymManagement.Domain.Models;
+using GymManagementSystem.API.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -15,6 +16,7 @@ namespace GymManagement.DataAcces.Data
         {
         }
 
-        public DbSet<Member> Members { get; set; }
+        public DbSet<Member> Member_Table{ get; set; }
+        public DbSet<Product> Products { get; set; }
     }
 }

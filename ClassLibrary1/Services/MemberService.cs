@@ -1,4 +1,5 @@
-﻿using GymManagementSystem.API.Models;
+﻿using GymManagement.DataAcces.Repositories;
+using GymManagementSystem.API.Models;
 using GymManagementSystem.Business.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -8,16 +9,16 @@ using System.Threading.Tasks;
 
 namespace GymManagementSystem.Business.Services
 {
-    public class MemberService1 : IMemberService
+    public class Member_Tableervice1 : IMember_Tableervice
     {
         private readonly IMemberRepository _repository;
-        public MemberService1(IMemberRepository repository)
+        public Member_Tableervice1(IMemberRepository repository)
         {
             _repository = repository;
         }
-        public Task<IEnumerable<Member>> GetAllMembersAsync()
+        public Task<IEnumerable<Member>> GetAllMember_TableAsync()
         {
-            return _repository.GetAllMembersAsync();
+            return _repository.GetAllMember_TableAsync();
         }
 
         public async Task<Member> GetMemberByIdAsync(int id)
