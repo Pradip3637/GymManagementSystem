@@ -38,7 +38,8 @@ builder.Services.AddScoped<IMember_Tableervice, Member_Tableervice1>();
 builder.Services.AddScoped<IMemberRepository,MemberRepository>();
 builder.Services.AddDbContext<GymDbContext>(options =>
 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 
