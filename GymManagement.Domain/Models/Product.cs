@@ -9,7 +9,7 @@ namespace GymManagement.Domain.Models
 {
     public class Product
     {
-        public int Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
         public string Name { get; set; } = string.Empty;
 
         [Precision(18, 2)]
@@ -18,6 +18,7 @@ namespace GymManagement.Domain.Models
         public string Location { get; set; } = string.Empty;
         public string? Image { get; set; }
         public double Rating { get; set; }
-        
+        public int Quantity { get; set; }
+
     }
 }

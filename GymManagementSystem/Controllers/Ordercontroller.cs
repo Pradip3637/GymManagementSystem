@@ -55,7 +55,7 @@ public class OrderController : ControllerBase
             // 1) Orders
             const string orderSql = @"INSERT INTO Orders
                 (UserId, AddressId, SubTotal, ShippingCharge, TaxAmount, TotalAmount, OrderStatus)
-                VALUES (@UserId, @AddressId, @SubTotal, @ShippingCharge, @TaxAmount, @TotalAmount, 'Pending');
+                 VALUES (@UserId, @AddressId, @SubTotal, @ShippingCharge, @TaxAmount, @TotalAmount,'Order Placed'););
                 SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
             int orderId;
@@ -69,6 +69,11 @@ public class OrderController : ControllerBase
                 cmd.Parameters.AddWithValue("@TotalAmount", dto.TotalAmount);
                 orderId = (int)(await cmd.ExecuteScalarAsync())!;
             }
+
+            // 1b) First tracking step
+            await ExecAsync(con, tx,
+                "INSERT INTO OrderStatusHistory (OrderId, Status, Note) VALUES (@Id, 'Order Placed', 'We have received your order.')",
+                ("@Id", orderId));
 
             // 2) OrderItems (TotalPrice is a computed column, so it is not inserted)
             foreach (var item in dto.Items)
@@ -106,6 +111,245 @@ public class OrderController : ControllerBase
         {
             await tx.RollbackAsync();
             throw;
+        }
+    }
+    // =====================================================================
+    // PASTE THIS INSIDE your OrderController class (NOT at the end of the file).
+    // Put it directly ABOVE this line in your file:
+    //     // GET api/order/test-email?to=you@gmail.com ...
+    // Do not paste these two comment lines.
+    // =====================================================================
+
+    // ================= ORDER TRACKING =================
+
+    // The order moves forward through this list (it can never go back)
+    private static readonly string[] Statuses =
+    {
+        "Order Placed", "Payment Confirmed", "Order Confirmed", "Processing", "Packed",
+        "Ready to Ship", "Picked Up", "In Transit", "Out for Delivery", "Delivered"
+    };
+
+    // These steps also send an email to the customer
+    private static readonly string[] EmailStatuses =
+        { "Order Confirmed", "Picked Up", "Out for Delivery", "Delivered" };
+
+    public class OrderSummaryDto
+    {
+        public int OrderId { get; set; }
+        public DateTime OrderDate { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string OrderStatus { get; set; } = "";
+    }
+
+    public class HistoryDto
+    {
+        public string Status { get; set; } = "";
+        public string? Note { get; set; }
+        public DateTime CreatedDate { get; set; }
+    }
+
+    public class TrackingDto : OrderSummaryDto
+    {
+        public List<HistoryDto> History { get; set; } = new();
+    }
+
+    public class UpdateStatusDto
+    {
+        [Required] public string Status { get; set; } = "";
+        public string? Note { get; set; }
+    }
+
+    // GET api/order/user/1   -> the user's orders (newest first)
+    [HttpGet("user/{userId:int}")]
+    public async Task<ActionResult<List<OrderSummaryDto>>> GetByUser(int userId)
+    {
+        var list = new List<OrderSummaryDto>();
+
+        await using var con = new SqlConnection(_connectionString);
+        await con.OpenAsync();
+
+        await using var cmd = new SqlCommand(
+            @"SELECT OrderId, OrderDate, TotalAmount, OrderStatus
+              FROM Orders WHERE UserId = @UserId ORDER BY OrderId DESC", con);
+        cmd.Parameters.AddWithValue("@UserId", userId);
+
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+        {
+            list.Add(new OrderSummaryDto
+            {
+                OrderId = r.GetInt32(0),
+                OrderDate = r.GetDateTime(1),
+                TotalAmount = r.GetDecimal(2),
+                OrderStatus = r.IsDBNull(3) ? "" : r.GetString(3)
+            });
+        }
+        return Ok(list);
+    }
+
+    // GET api/order/5/tracking?userId=1   -> one order with its status history
+    [HttpGet("{id:int}/tracking")]
+    public async Task<ActionResult<TrackingDto>> GetTracking(int id, [FromQuery] int? userId)
+    {
+        await using var con = new SqlConnection(_connectionString);
+        await con.OpenAsync();
+
+        TrackingDto? result = null;
+
+        await using (var cmd = new SqlCommand(
+            @"SELECT OrderId, OrderDate, TotalAmount, OrderStatus FROM Orders
+              WHERE OrderId = @Id AND (@UserId IS NULL OR UserId = @UserId)", con))
+        {
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.Parameters.AddWithValue("@UserId", (object?)userId ?? DBNull.Value);
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (await r.ReadAsync())
+            {
+                result = new TrackingDto
+                {
+                    OrderId = r.GetInt32(0),
+                    OrderDate = r.GetDateTime(1),
+                    TotalAmount = r.GetDecimal(2),
+                    OrderStatus = r.IsDBNull(3) ? "" : r.GetString(3)
+                };
+            }
+        }
+
+        if (result == null) return NotFound();
+
+        await using (var cmd = new SqlCommand(
+            "SELECT Status, Note, CreatedDate FROM OrderStatusHistory WHERE OrderId = @Id ORDER BY HistoryId", con))
+        {
+            cmd.Parameters.AddWithValue("@Id", id);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                result.History.Add(new HistoryDto
+                {
+                    Status = r.GetString(0),
+                    Note = r.IsDBNull(1) ? null : r.GetString(1),
+                    CreatedDate = r.GetDateTime(2)
+                });
+            }
+        }
+
+        return Ok(result);
+    }
+
+    // PUT api/order/5/status      body: { "status": "Packed", "note": "optional" }
+    // Used by the shop owner / admin to move the order to its next step.
+    // NOTE: add login/authorization before you publish the site.
+    [HttpPut("{id:int}/status")]
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)
+    {
+        var newIndex = Array.FindIndex(Statuses,
+            s => s.Equals(dto.Status?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (newIndex < 0)
+            return BadRequest("Status must be one of: " + string.Join(", ", Statuses));
+        var newStatus = Statuses[newIndex];
+
+        await using var con = new SqlConnection(_connectionString);
+        await con.OpenAsync();
+
+        string? current;
+        await using (var cmd = new SqlCommand("SELECT OrderStatus FROM Orders WHERE OrderId = @Id", con))
+        {
+            cmd.Parameters.AddWithValue("@Id", id);
+            var value = await cmd.ExecuteScalarAsync();
+            if (value == null) return NotFound();
+            current = value == DBNull.Value ? null : (string)value;
+        }
+
+        var currentIndex = Array.FindIndex(Statuses,
+            s => s.Equals(current, StringComparison.OrdinalIgnoreCase));
+        if (newIndex <= currentIndex)
+            return BadRequest($"The order is already at '{current}'. A status can only move forward.");
+
+        await using var tx = con.BeginTransaction();
+        try
+        {
+            await ExecAsync(con, tx, "UPDATE Orders SET OrderStatus = @S WHERE OrderId = @Id",
+                ("@S", newStatus), ("@Id", id));
+
+            await ExecAsync(con, tx,
+                "INSERT INTO OrderStatusHistory (OrderId, Status, Note) VALUES (@Id, @S, @N)",
+                ("@Id", id), ("@S", newStatus), ("@N", dto.Note));
+
+            // Payment becomes "Paid" when payment is confirmed (COD: when delivered)
+            await ExecAsync(con, tx,
+                @"UPDATE Payment SET PaymentStatus = 'Paid'
+                  WHERE OrderId = @Id AND PaymentStatus <> 'Paid'
+                    AND (@S = 'Payment Confirmed' OR (@S = 'Delivered' AND PaymentMethod = 'COD'))",
+                ("@Id", id), ("@S", newStatus));
+
+            await tx.CommitAsync();
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+
+        if (EmailStatuses.Contains(newStatus))
+            await SendStatusEmailAsync(id, newStatus);
+
+        return Ok(new { orderId = id, status = newStatus });
+    }
+
+    private static async Task ExecAsync(SqlConnection con, SqlTransaction tx, string sql,
+        params (string Name, object? Value)[] args)
+    {
+        await using var cmd = new SqlCommand(sql, con, tx);
+        foreach (var (name, value) in args)
+            cmd.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    private async Task SendStatusEmailAsync(int orderId, string status)
+    {
+        try
+        {
+            string name = "";
+            string? email = null;
+
+            await using var con = new SqlConnection(_connectionString);
+            await con.OpenAsync();
+            await using (var cmd = new SqlCommand(
+                @"SELECT a.FullName, a.Email FROM Orders o
+                  JOIN Address a ON a.AddressId = o.AddressId WHERE o.OrderId = @Id", con))
+            {
+                cmd.Parameters.AddWithValue("@Id", orderId);
+                await using var r = await cmd.ExecuteReaderAsync();
+                if (await r.ReadAsync())
+                {
+                    name = r.GetString(0);
+                    email = r.IsDBNull(1) ? null : r.GetString(1);
+                }
+            }
+            if (string.IsNullOrWhiteSpace(email)) return;
+
+            var text = status switch
+            {
+                "Order Confirmed" => "Your order has been confirmed and will be prepared shortly.",
+                "Picked Up" => "Your package has been picked up by our delivery partner.",
+                "Out for Delivery" => "Your order is out for delivery and will reach you today.",
+                "Delivered" => "Your order has been delivered. Enjoy!",
+                _ => "Your order status was updated."
+            };
+
+            var html = $@"
+                <div style='font-family:Arial,sans-serif;max-width:520px;margin:auto'>
+                  <h2 style='color:#18392d'>Hi {System.Net.WebUtility.HtmlEncode(name)},</h2>
+                  <p>{text}</p>
+                  <p><b>Order #{orderId}</b> &mdash; {status}</p>
+                  <p style='color:#666;font-size:12px'>Coco Republic &ndash; goodness from the inside out.</p>
+                </div>";
+
+            await _email.SendAsync(email, $"Order #{orderId}: {status}", html);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Could not send status email for order {OrderId}", orderId);
         }
     }
 

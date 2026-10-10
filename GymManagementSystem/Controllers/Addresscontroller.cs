@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using System.ComponentModel.DataAnnotations;
 
 // Put this in your ASP.NET Core API project (Controllers folder).
 // Needs a connection string named "DefaultConnection" in appsettings.json.
