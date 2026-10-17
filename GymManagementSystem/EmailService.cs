@@ -1,10 +1,9 @@
-﻿using MailKit.Net.Smtp;
+﻿using GymManagement.Domain.Models;
+using GymManagementSystem.Business.Services;
+using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
-
-// Put this file in your ASP.NET Core API project (any folder, e.g. "Services").
-// NuGet package needed:  dotnet add package MailKit
 
 public class SmtpSettings
 {
@@ -14,11 +13,6 @@ public class SmtpSettings
     public string Password { get; set; } = "";
     public string FromEmail { get; set; } = "";
     public string FromName { get; set; } = "Coco Republic";
-}
-
-public interface IEmailService
-{
-    Task SendAsync(string to, string subject, string htmlBody);
 }
 
 public class EmailService : IEmailService
@@ -44,4 +38,5 @@ public class EmailService : IEmailService
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
+
 }

@@ -16,10 +16,10 @@ namespace GymManagement.DataAcces.Repositories
         public ProductRepository(GymDbContext context) => _context = context;
 
         public async Task<IEnumerable<Product>> GetAllAsync()
-            => await _context.Products.ToListAsync();
+            => await _context.Products.AsNoTracking().ToListAsync();
 
-        public async Task<Product?> GetByIdAsync(int id)
-            => await _context.Products.FindAsync(id);
+        public async Task<Product?> GetByIdAsync(Guid id)
+            => await _context.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
 
         public async Task<Product> AddAsync(Product product)
         {
@@ -39,12 +39,13 @@ namespace GymManagement.DataAcces.Repositories
             existing.Location = product.Location;
             existing.Image = product.Image;
             existing.Rating = product.Rating;
+            existing.Quantity = product.Quantity;            // new
+            existing.NotifyEmails = product.NotifyEmails;    // new
 
             await _context.SaveChangesAsync();
             return existing;
         }
-
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(Guid id)
         {
             var existing = await _context.Products.FindAsync(id);
             if (existing == null) return false;

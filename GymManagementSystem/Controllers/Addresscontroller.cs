@@ -2,11 +2,6 @@
 using Microsoft.Data.SqlClient;
 using System.ComponentModel.DataAnnotations;
 
-// Put this in your ASP.NET Core API project (Controllers folder).
-// Needs a connection string named "DefaultConnection" in appsettings.json.
-// If you use Entity Framework or Dapper, keep the routes and JSON shape the same
-// and swap the SQL for your own data access.
-
 [ApiController]
 [Route("api/[controller]")]
 public class AddressController : ControllerBase
@@ -21,26 +16,24 @@ public class AddressController : ControllerBase
 
     public class AddressDto
     {
-        public int AddressId { get; set; }
-        public int UserId { get; set; }
+        public Guid AddressId { get; set; }
+        public Guid UserId { get; set; }
         [Required, StringLength(100)] public string FullName { get; set; } = "";
         [Required, StringLength(15)] public string PhoneNumber { get; set; } = "";
         [Required, StringLength(200)] public string AddressLine1 { get; set; } = "";
         [StringLength(200)] public string? AddressLine2 { get; set; }
-        [Required, StringLength(100)] public string City { get; set; } = "";
-        [Required, StringLength(100)] public string State { get; set; } = "";
-        [Required, StringLength(100)] public string Country { get; set; } = "";
-        [Required, StringLength(20)] public string ZipCode { get; set; } = "";
-        [EmailAddress, StringLength(150)] public string? Email { get; set; }
+        [Required, StringLength(50)] public string City { get; set; } = "";
+        [Required, StringLength(50)] public string State { get; set; } = "";
+        [Required, StringLength(50)] public string Country { get; set; } = "";
+        [Required, StringLength(10)] public string ZipCode { get; set; } = "";
+        [EmailAddress, StringLength(100)] public string? Email { get; set; }
         public bool IsDefault { get; set; }
     }
 
-    // GET api/address/user/1
-    [HttpGet("user/{userId:int}")]
-    public async Task<ActionResult<List<AddressDto>>> GetByUser(int userId)
+    [HttpGet("user/{userId:guid}")]
+    public async Task<ActionResult<List<AddressDto>>> GetByUser(Guid userId)
     {
         var list = new List<AddressDto>();
-
         await using var con = new SqlConnection(_connectionString);
         await con.OpenAsync();
 
@@ -48,7 +41,7 @@ public class AddressController : ControllerBase
                                     City, State, Country, ZipCode, IsDefault, Email
                              FROM Address
                              WHERE UserId = @UserId AND IsDeleted = 0
-                             ORDER BY IsDefault DESC, AddressId DESC";
+                             ORDER BY IsDefault DESC, CreatedDate DESC";
 
         await using var cmd = new SqlCommand(sql, con);
         cmd.Parameters.AddWithValue("@UserId", userId);
@@ -58,28 +51,25 @@ public class AddressController : ControllerBase
         {
             list.Add(new AddressDto
             {
-                AddressId = r.GetInt32(0),
-                UserId = r.GetInt32(1),
+                AddressId = r.GetGuid(0),
+                UserId = r.GetGuid(1),
                 FullName = r.GetString(2),
-                PhoneNumber = r.GetString(3),
+                PhoneNumber = r.IsDBNull(3) ? "" : r.GetString(3),
                 AddressLine1 = r.GetString(4),
                 AddressLine2 = r.IsDBNull(5) ? null : r.GetString(5),
-                City = r.GetString(6),
-                State = r.GetString(7),
-                Country = r.GetString(8),
-                ZipCode = r.GetString(9),
+                City = r.IsDBNull(6) ? "" : r.GetString(6),
+                State = r.IsDBNull(7) ? "" : r.GetString(7),
+                Country = r.IsDBNull(8) ? "" : r.GetString(8),
+                ZipCode = r.IsDBNull(9) ? "" : r.GetString(9),
                 IsDefault = !r.IsDBNull(10) && r.GetBoolean(10),
                 Email = r.IsDBNull(11) ? null : r.GetString(11)
             });
         }
-
         return Ok(list);
     }
 
-    // DELETE api/address/5?userId=1
-    // Soft delete: the row stays in SQL (old orders still point to it) but is hidden.
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id, [FromQuery] int userId)
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, [FromQuery] Guid userId)
     {
         await using var con = new SqlConnection(_connectionString);
         await con.OpenAsync();
@@ -94,7 +84,6 @@ public class AddressController : ControllerBase
         return rows > 0 ? NoContent() : NotFound();
     }
 
-    // POST api/address
     [HttpPost]
     public async Task<ActionResult<AddressDto>> Create([FromBody] AddressDto dto)
     {
@@ -112,13 +101,15 @@ public class AddressController : ControllerBase
                 await clear.ExecuteNonQueryAsync();
             }
 
+            dto.AddressId = Guid.NewGuid();
+
             const string sql = @"INSERT INTO Address
-                (UserId, FullName, PhoneNumber, AddressLine1, AddressLine2, City, State, Country, ZipCode, IsDefault, Email)
+                (AddressId, UserId, FullName, PhoneNumber, AddressLine1, AddressLine2, City, State, Country, ZipCode, IsDefault, Email)
                 VALUES
-                (@UserId, @FullName, @PhoneNumber, @AddressLine1, @AddressLine2, @City, @State, @Country, @ZipCode, @IsDefault, @Email);
-                SELECT CAST(SCOPE_IDENTITY() AS INT);";
+                (@AddressId, @UserId, @FullName, @PhoneNumber, @AddressLine1, @AddressLine2, @City, @State, @Country, @ZipCode, @IsDefault, @Email);";
 
             await using var cmd = new SqlCommand(sql, con, tx);
+            cmd.Parameters.AddWithValue("@AddressId", dto.AddressId);
             cmd.Parameters.AddWithValue("@UserId", dto.UserId);
             cmd.Parameters.AddWithValue("@FullName", dto.FullName);
             cmd.Parameters.AddWithValue("@PhoneNumber", dto.PhoneNumber);
@@ -131,7 +122,7 @@ public class AddressController : ControllerBase
             cmd.Parameters.AddWithValue("@Email", (object?)dto.Email ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@IsDefault", dto.IsDefault);
 
-            dto.AddressId = (int)(await cmd.ExecuteScalarAsync())!;
+            await cmd.ExecuteNonQueryAsync();
             await tx.CommitAsync();
             return Ok(dto);
         }

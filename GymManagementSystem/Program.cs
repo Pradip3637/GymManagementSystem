@@ -3,7 +3,6 @@ using GymManagement.DataAcces.Interfaces;
 using GymManagement.DataAcces.Repositories;
 using GymManagementSystem.Business.Interfaces;
 using GymManagementSystem.Business.Services;
-using GymManagementSystem.Business.Services.GymManagementSystem.Business.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.StaticFiles;
 
@@ -40,7 +39,10 @@ builder.Services.AddDbContext<GymDbContext>(options =>
 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("Smtp"));
 builder.Services.AddScoped<IEmailService, EmailService>();
-
+ //builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
+builder.Services.AddHostedService<StockNotifierService>();
+builder.Services.AddScoped<IStockAlertService, StockAlertService>();
+builder.Services.Configure<StockAlertSettings>(builder.Configuration.GetSection("StockAlert"));
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

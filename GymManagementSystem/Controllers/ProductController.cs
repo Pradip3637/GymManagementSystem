@@ -24,8 +24,8 @@ namespace GymManagementSystem.API.Controllers
         }
 
         // GET: api/Product/5
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
+        [HttpGet("{id:guid}")]
+        public async Task<IActionResult> GetById(Guid id)
         {
             var product = await _service.GetProductByIdAsync(id);
             if (product == null) return NotFound();
@@ -50,12 +50,41 @@ namespace GymManagementSystem.API.Controllers
         }
 
         // DELETE: api/Product/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{id:guid}")]
+        public async Task<IActionResult> Delete(Guid id)
         {
             var deleted = await _service.DeleteProductAsync(id);
             if (!deleted) return NotFound();
             return NoContent();
         }
+        public class NotifyDto
+        {
+            public string Email { get; set; } = "";
+        }
+
+        // POST: api/Product/{id}/notify
+        [HttpPost("{id:guid}/notify")]
+        public async Task<IActionResult> Notify(Guid id, [FromBody] NotifyDto dto)
+        {
+            var email = dto.Email?.Trim() ?? "";
+            if (string.IsNullOrEmpty(email)) return BadRequest("Email is required.");
+
+            var products = await _service.GetAllProductsAsync();
+            var product = products.FirstOrDefault(p => p.Id == id);
+            if (product == null) return NotFound();
+
+            var list = (product.NotifyEmails ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            if (!list.Contains(email, StringComparer.OrdinalIgnoreCase))
+            {
+                list.Add(email);
+                product.NotifyEmails = string.Join(",", list);
+                await _service.UpdateProductAsync(product);
+            }
+            return Ok();
+        }
     }
+    
 }
